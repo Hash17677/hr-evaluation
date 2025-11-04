@@ -1,0 +1,1069 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Employee Evaluation Analysis Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <style>
+        .chart-container {
+            position: relative;
+            height: 300px;
+        }
+        .tooltip-custom {
+            position: absolute;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 8px;
+            border-radius: 4px;
+            pointer-events: none;
+            z-index: 1000;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 transition-colors duration-200">
+    <!-- Header -->
+    <header class="bg-gradient-to-r from-blue-600 to-blue-800 text-white shadow-lg">
+        <div class="container mx-auto px-6 py-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-6">
+                    <!-- fixed-size container with overflow-hidden, image is scaled inside without changing container size -->
+                    <div class="h-16 w-16 flex-shrink-0 overflow-hidden rounded-lg bg-white p-2">
+                        <img src="https://www.dpmco.com/public/images/dpmc-logo.jpg" alt="DP Infotech" class="w-full h-full object-cover transform scale-125">
+                    </div>
+                    <div>
+                        <h1 class="text-3xl font-bold">Employee Evaluation Analysis</h1>
+                        <p class="text-blue-100 mt-1">Self vs. Manager Performance Review Dashboard</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-4">
+                    <label class="bg-white hover:bg-gray-100 text-blue-700 font-semibold px-6 py-3 rounded-lg cursor-pointer transition shadow-lg flex items-center gap-2">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+                        </svg>
+                        Upload CSV
+                        <input type="file" id="csvFileInput" accept=".csv" style="display: none;" onchange="loadCSVFile(event)">
+                    </label>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" style="display: none;">
+        <div class="bg-white rounded-lg p-8 text-center">
+            <div class="animate-spin rounded-full h-16 w-16 border-b-4 border-blue-600 mx-auto mb-4"></div>
+            <p class="text-xl font-semibold text-gray-700">Loading CSV Data...</p>
+        </div>
+    </div>
+
+    <!-- Filters Section -->
+    <div class="container mx-auto px-6 py-6">
+        <div class="bg-white rounded-lg shadow-md p-6 card-bg">
+            <h2 class="text-xl font-semibold mb-4 text-gray-800">Filters</h2>
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Company</label>
+                    <select id="filterCompany" onchange="applyFilters()" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="">All Companies</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Division</label>
+                    <select id="filterDivision" onchange="applyFilters()" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="">All Divisions</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Grade</label>
+                    <select id="filterGrade" onchange="applyFilters()" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="">All Grades</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Manager</label>
+                    <select id="filterManager" onchange="applyFilters()" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="">All Managers</option>
+                    </select>
+                </div>
+            </div>
+            <div class="mt-4">
+                <button onclick="resetFilters()" class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-md transition">
+                    Reset Filters
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Executive Summary -->
+    <div class="container mx-auto px-6 py-6">
+        <h2 class="text-2xl font-bold text-gray-800 mb-6">Executive Summary</h2>
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+            <div class="bg-white rounded-lg shadow-md p-6 card-bg transform hover:scale-105 transition">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-600 text-sm font-medium">Total Employees</p>
+                        <h3 class="text-3xl font-bold text-blue-600 mt-2" id="totalEmployees">0</h3>
+                    </div>
+                    <div class="bg-blue-100 rounded-full p-4">
+                        <span class="text-4xl">👥</span>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-white rounded-lg shadow-md p-6 card-bg transform hover:scale-105 transition">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-600 text-sm font-medium">Completion Rate</p>
+                        <h3 class="text-3xl font-bold text-green-600 mt-2" id="completionRate">0%</h3>
+                    </div>
+                    <div class="bg-green-100 rounded-full p-4">
+                        <span class="text-4xl">✓</span>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-white rounded-lg shadow-md p-6 card-bg transform hover:scale-105 transition">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-600 text-sm font-medium">Avg Rating Gap</p>
+                        <h3 class="text-3xl font-bold text-purple-600 mt-2" id="avgRatingGap">0</h3>
+                    </div>
+                    <div class="bg-purple-100 rounded-full p-4">
+                        <span class="text-4xl">📊</span>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-white rounded-lg shadow-md p-6 card-bg transform hover:scale-105 transition">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-600 text-sm font-medium">Perfect Alignment</p>
+                        <h3 class="text-3xl font-bold text-amber-600 mt-2" id="perfectAlignment">0%</h3>
+                    </div>
+                    <div class="bg-amber-100 rounded-full p-4">
+                        <span class="text-4xl">🎯</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Rating Distribution Analysis -->
+    <div class="container mx-auto px-6 py-6">
+        <h2 class="text-2xl font-bold text-gray-800 mb-6">Rating Distribution Analysis</h2>
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div class="bg-white rounded-lg shadow-md p-6 card-bg">
+                <h3 class="text-lg font-semibold text-gray-700 mb-4">Self-Evaluation Distribution</h3>
+                <div class="chart-container">
+                    <canvas id="selfEvalChart"></canvas>
+                </div>
+            </div>
+            <div class="bg-white rounded-lg shadow-md p-6 card-bg">
+                <h3 class="text-lg font-semibold text-gray-700 mb-4">Manager Evaluation Distribution</h3>
+                <div class="chart-container">
+                    <canvas id="managerEvalChart"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="mt-6 bg-white rounded-lg shadow-md p-6 card-bg">
+            <h3 class="text-lg font-semibold text-gray-700 mb-4">Comparative Rating Distribution</h3>
+            <div class="chart-container">
+                <canvas id="comparisonChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Rating Alignment Matrix -->
+    <div class="container mx-auto px-6 py-6">
+        <h2 class="text-2xl font-bold text-gray-800 mb-6">Rating Alignment Matrix</h2>
+        <div class="bg-white rounded-lg shadow-md p-6 card-bg">
+            <p class="text-gray-600 mb-4">Heat map showing the relationship between self-ratings and manager ratings. Darker colors indicate higher frequency.</p>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm" id="alignmentMatrix">
+                    <thead>
+                        <tr class="border-b-2 border-gray-300">
+                            <th class="p-3 text-left font-semibold">Self ↓ / Manager →</th>
+                            <th class="p-3 text-center font-semibold bg-red-50">Unsatisfactory</th>
+                            <th class="p-3 text-center font-semibold bg-orange-50">Needs Improvement</th>
+                            <th class="p-3 text-center font-semibold bg-yellow-50">Effective</th>
+                            <th class="p-3 text-center font-semibold bg-green-50">Highly Effective</th>
+                            <th class="p-3 text-center font-semibold bg-emerald-50">Exceptional</th>
+                        </tr>
+                    </thead>
+                    <tbody id="matrixBody">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Trend Analysis -->
+    <div class="container mx-auto px-6 py-6">
+        <h2 class="text-2xl font-bold text-gray-800 mb-6">Rating Gap Analysis</h2>
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+            <div class="bg-white rounded-lg shadow-md p-6 card-bg">
+                <div class="flex items-center justify-between mb-2">
+                    <h3 class="text-lg font-semibold text-red-600">Overestimation</h3>
+                    <span class="text-3xl">📈</span>
+                </div>
+                <p class="text-3xl font-bold text-gray-800" id="overestimationCount">0</p>
+                <p class="text-sm text-gray-600 mt-2">Employees rated themselves higher than managers</p>
+            </div>
+            <div class="bg-white rounded-lg shadow-md p-6 card-bg">
+                <div class="flex items-center justify-between mb-2">
+                    <h3 class="text-lg font-semibold text-blue-600">Perfect Match</h3>
+                    <span class="text-3xl">🎯</span>
+                </div>
+                <p class="text-3xl font-bold text-gray-800" id="perfectMatchCount">0</p>
+                <p class="text-sm text-gray-600 mt-2">Complete alignment between ratings</p>
+            </div>
+            <div class="bg-white rounded-lg shadow-md p-6 card-bg">
+                <div class="flex items-center justify-between mb-2">
+                    <h3 class="text-lg font-semibold text-green-600">Underestimation</h3>
+                    <span class="text-3xl">📉</span>
+                </div>
+                <p class="text-3xl font-bold text-gray-800" id="underestimationCount">0</p>
+                <p class="text-sm text-gray-600 mt-2">Employees rated themselves lower than managers</p>
+            </div>
+        </div>
+        <div class="bg-white rounded-lg shadow-md p-6 card-bg">
+            <h3 class="text-lg font-semibold text-gray-700 mb-4">Rating Gap Distribution</h3>
+            <div class="chart-container">
+                <canvas id="gapChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Departmental Analysis -->
+    <div class="container mx-auto px-6 py-6">
+        <h2 class="text-2xl font-bold text-gray-800 mb-6">Departmental Analysis</h2>
+        <div class="bg-white rounded-lg shadow-md p-6 card-bg">
+            <h3 class="text-lg font-semibold text-gray-700 mb-4">Rating Patterns by Division</h3>
+            <div class="chart-container" style="height: 400px;">
+                <canvas id="departmentChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Manager Analysis -->
+    <div class="container mx-auto px-6 py-6">
+        <h2 class="text-2xl font-bold text-gray-800 mb-6">Performance Distribution by Manager</h2>
+        <div class="bg-white rounded-lg shadow-md p-6 card-bg">
+            <div class="chart-container" style="height: 400px;">
+                <canvas id="managerChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Insights & Recommendations -->
+    <div class="container mx-auto px-6 py-6">
+        <h2 class="text-2xl font-bold text-gray-800 mb-6">Key Insights & Recommendations</h2>
+        <div class="bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg shadow-md p-6 card-bg">
+            <div id="insightsPanel" class="space-y-4">
+            </div>
+        </div>
+    </div>
+
+    <!-- Detailed Data Table -->
+    <div class="container mx-auto px-6 py-6 pb-12">
+        <h2 class="text-2xl font-bold text-gray-800 mb-6">Detailed Evaluation Records</h2>
+        <div class="bg-white rounded-lg shadow-md p-6 card-bg">
+            <div class="mb-4">
+                <input type="text" id="searchTable" onkeyup="searchTable()" placeholder="Search by employee name, manager, or division..." class="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm" id="dataTable">
+                    <thead>
+                        <tr class="bg-gray-100 border-b-2 border-gray-300">
+                            <th class="p-3 text-left cursor-pointer hover:bg-gray-200" onclick="sortTable(0)">Employee Name ↕</th>
+                            <th class="p-3 text-left cursor-pointer hover:bg-gray-200" onclick="sortTable(1)">Division ↕</th>
+                            <th class="p-3 text-left cursor-pointer hover:bg-gray-200" onclick="sortTable(2)">Grade ↕</th>
+                            <th class="p-3 text-left cursor-pointer hover:bg-gray-200" onclick="sortTable(3)">Manager ↕</th>
+                            <th class="p-3 text-center cursor-pointer hover:bg-gray-200" onclick="sortTable(4)">Self Rating ↕</th>
+                            <th class="p-3 text-center cursor-pointer hover:bg-gray-200" onclick="sortTable(5)">Manager Rating ↕</th>
+                            <th class="p-3 text-center cursor-pointer hover:bg-gray-200" onclick="sortTable(6)">Self Score ↕</th>
+                            <th class="p-3 text-center cursor-pointer hover:bg-gray-200" onclick="sortTable(7)">Manager Score ↕</th>
+                            <th class="p-3 text-center cursor-pointer hover:bg-gray-200" onclick="sortTable(8)">Gap ↕</th>
+                            <th class="p-3 text-center">Alignment</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tableBody">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        const ratings = ['EXCEPTIONAL', 'HIGHLY EFFECTIVE', 'EFFECTIVE', 'NEEDS IMPROVEMENT', 'UNSATISFACTORY'];
+        let employeeData = [];
+        let filteredData = [];
+        let charts = {};
+        let loadingTimeout = null;
+
+        // CSV File Upload Function
+        function loadCSVFile(event) {
+            const file = event.target.files[0];
+            if (file) {
+                showLoading(true);
+                
+                // Safety timeout - hide loading after 30 seconds if something goes wrong
+                loadingTimeout = setTimeout(() => {
+                    showLoading(false);
+                    console.error('Loading timeout - operation took too long');
+                    alert('Loading took too long. Please try again with a smaller CSV file or check the file format.');
+                }, 30000);
+                
+                Papa.parse(file, {
+                    header: true,
+                    skipEmptyLines: true,
+                    complete: function(results) {
+                        clearTimeout(loadingTimeout);
+                        if (results.errors && results.errors.length > 0) {
+                            console.warn('CSV parsing warnings:', results.errors);
+                        }
+                        processCSVData(results.data);
+                    },
+                    error: function(error) {
+                        clearTimeout(loadingTimeout);
+                        console.error('Error parsing CSV:', error);
+                        showLoading(false);
+                        alert('Error parsing CSV file. Please check the file format.\nError: ' + error.message);
+                    }
+                });
+            }
+        }
+
+        function processCSVData(data) {
+            try {
+                console.log('Processing CSV data...', data.length, 'rows');
+                
+                employeeData = data.map(row => {
+                    // Parse the CSV row and map to our data structure
+                    return {
+                        company: row['COMPANY'] || '',
+                        employeeNumber: row['EMPLOYEE NUMBER'] || '',
+                        employeeName: row['EMPLOYEE NAME'] || '',
+                        employeeGrade: row['EMPLOYEE GRADE/CATEGORY/DESIGNATION'] || '',
+                        employeeDivision: row['EMPLOYEE DIVISION/LOCATION'] || '',
+                        managerCode: row['MANAGER CODE'] || '',
+                        managerName: row['MANAGER NAME'] || '',
+                        firstApprovalCode: row['FIRST APPROVAL CODE'] || '',
+                        firstApproval: row['FIRST APPROVAL'] || '',
+                        firstApprovalDate: row['FIRST APPROVAL DATE'] || '',
+                        performanceDocumentName: row['PERFORMANCE DOCUMENT NAME'] || '',
+                        employeeRating: parseFloat(row['EMPLOYEE RATING']) || 0,
+                        managerRating: parseFloat(row['MANAGER RATING']) || 0,
+                        status: row['PERFORMANCE DOCUMENT STATUS'] || '',
+                        employeeFeedback: row['EMPLOYEE FINAL FEEDBACK'] || '',
+                        selfEvaluation: (row['PERFORMANCE LEVEL - SELF EVALUATION'] || '').toUpperCase().trim(),
+                        managerEvaluation: (row['PERFORMANCE LEVEL - MANAGER EVALUATION'] || '').toUpperCase().trim()
+                    };
+                }).filter(emp => emp.employeeName && emp.selfEvaluation && emp.managerEvaluation);
+
+                console.log('Filtered employee data:', employeeData.length, 'valid records');
+
+                if (employeeData.length === 0) {
+                    showLoading(false);
+                    alert('No valid data found in CSV file. Please check that:\n1. Employee names are filled\n2. Self evaluation ratings are present\n3. Manager evaluation ratings are present');
+                    return;
+                }
+
+                filteredData = [...employeeData];
+                hideDataStatusBanner();
+                initDashboard();
+            } catch (error) {
+                console.error('Error processing CSV data:', error);
+                showLoading(false);
+                alert('Error processing CSV file: ' + error.message);
+            }
+        }
+
+        function showLoading(show) {
+            const overlay = document.getElementById('loadingOverlay');
+            if (overlay) {
+                overlay.style.display = show ? 'flex' : 'none';
+            }
+        }
+
+        function hideDataStatusBanner() {
+            const banner = document.getElementById('dataStatusBanner');
+            if (banner) {
+                banner.style.display = 'none';
+            }
+        }
+
+        // Initialize Dashboard
+        function initDashboard() {
+            try {
+                if (employeeData.length === 0) {
+                    showLoading(false);
+                    return;
+                }
+                
+                console.log('Initializing dashboard...');
+                populateFilters();
+                console.log('Filters populated');
+                
+                updateExecutiveSummary();
+                console.log('Executive summary updated');
+                
+                createCharts();
+                console.log('Charts created');
+                
+                populateAlignmentMatrix();
+                console.log('Alignment matrix populated');
+                
+                updateInsights();
+                console.log('Insights updated');
+                
+                populateDataTable();
+                console.log('Data table populated');
+                
+                showLoading(false);
+                console.log('Dashboard initialization complete!');
+            } catch (error) {
+                console.error('Error initializing dashboard:', error);
+                showLoading(false);
+                alert('Error initializing dashboard: ' + error.message + '\nCheck browser console for details.');
+            }
+        }
+
+        function populateFilters() {
+            const companies = [...new Set(employeeData.map(e => e.company))].filter(c => c).sort();
+            const divisions = [...new Set(employeeData.map(e => e.employeeDivision))].filter(d => d).sort();
+            const grades = [...new Set(employeeData.map(e => e.employeeGrade))].filter(g => g).sort();
+            const managerNames = [...new Set(employeeData.map(e => e.managerName))].filter(m => m).sort();
+
+            const companySelect = document.getElementById('filterCompany');
+            const divisionSelect = document.getElementById('filterDivision');
+            const gradeSelect = document.getElementById('filterGrade');
+            const managerSelect = document.getElementById('filterManager');
+
+            // Clear existing options (except the first "All" option)
+            companySelect.innerHTML = '<option value="">All Companies</option>';
+            divisionSelect.innerHTML = '<option value="">All Divisions</option>';
+            gradeSelect.innerHTML = '<option value="">All Grades</option>';
+            managerSelect.innerHTML = '<option value="">All Managers</option>';
+
+            companies.forEach(company => {
+                const option = document.createElement('option');
+                option.value = company;
+                option.textContent = company;
+                companySelect.appendChild(option);
+            });
+
+            divisions.forEach(div => {
+                const option = document.createElement('option');
+                option.value = div;
+                option.textContent = div;
+                divisionSelect.appendChild(option);
+            });
+
+            grades.forEach(grade => {
+                const option = document.createElement('option');
+                option.value = grade;
+                option.textContent = grade;
+                gradeSelect.appendChild(option);
+            });
+
+            managerNames.forEach(manager => {
+                const option = document.createElement('option');
+                option.value = manager;
+                option.textContent = manager;
+                managerSelect.appendChild(option);
+            });
+        }
+
+        function applyFilters() {
+            const company = document.getElementById('filterCompany').value;
+            const division = document.getElementById('filterDivision').value;
+            const grade = document.getElementById('filterGrade').value;
+            const manager = document.getElementById('filterManager').value;
+
+            filteredData = employeeData.filter(emp => {
+                return (!company || emp.company === company) &&
+                       (!division || emp.employeeDivision === division) &&
+                       (!grade || emp.employeeGrade === grade) &&
+                       (!manager || emp.managerName === manager);
+            });
+
+            updateExecutiveSummary();
+            updateCharts();
+            populateAlignmentMatrix();
+            updateInsights();
+            populateDataTable();
+        }
+
+        function resetFilters() {
+            document.getElementById('filterCompany').value = '';
+            document.getElementById('filterDivision').value = '';
+            document.getElementById('filterGrade').value = '';
+            document.getElementById('filterManager').value = '';
+            applyFilters();
+        }
+
+        function updateExecutiveSummary() {
+            const totalEmployees = filteredData.length;
+            
+            if (totalEmployees === 0) {
+                document.getElementById('totalEmployees').textContent = '0';
+                document.getElementById('completionRate').textContent = '0%';
+                document.getElementById('avgRatingGap').textContent = '0';
+                document.getElementById('perfectAlignment').textContent = '0%';
+                document.getElementById('overestimationCount').textContent = '0';
+                document.getElementById('perfectMatchCount').textContent = '0';
+                document.getElementById('underestimationCount').textContent = '0';
+                return;
+            }
+            
+            const completionRate = 100; // All records with data are considered complete
+            
+            const gaps = filteredData.map(e => e.managerRating - e.employeeRating);
+            const avgGap = (gaps.reduce((a, b) => a + b, 0) / gaps.length).toFixed(2);
+            
+            const perfectMatch = filteredData.filter(e => e.selfEvaluation === e.managerEvaluation).length;
+            const perfectAlignment = ((perfectMatch / totalEmployees) * 100).toFixed(1);
+
+            document.getElementById('totalEmployees').textContent = totalEmployees;
+            document.getElementById('completionRate').textContent = completionRate + '%';
+            document.getElementById('avgRatingGap').textContent = avgGap;
+            document.getElementById('perfectAlignment').textContent = perfectAlignment + '%';
+
+            // Update gap analysis
+            const overestimation = filteredData.filter(e => {
+                return ratings.indexOf(e.selfEvaluation) < ratings.indexOf(e.managerEvaluation);
+            }).length;
+            
+            const underestimation = filteredData.filter(e => {
+                return ratings.indexOf(e.selfEvaluation) > ratings.indexOf(e.managerEvaluation);
+            }).length;
+
+            document.getElementById('overestimationCount').textContent = overestimation;
+            document.getElementById('perfectMatchCount').textContent = perfectMatch;
+            document.getElementById('underestimationCount').textContent = underestimation;
+        }
+
+        function getRatingColor(rating) {
+            const colors = {
+                'EXCEPTIONAL': '#10B981',
+                'HIGHLY EFFECTIVE': '#34D399',
+                'EFFECTIVE': '#FBBF24',
+                'NEEDS IMPROVEMENT': '#F97316',
+                'UNSATISFACTORY': '#EF4444'
+            };
+            return colors[rating] || '#6B7280';
+        }
+
+        function createCharts() {
+            createSelfEvalChart();
+            createManagerEvalChart();
+            createComparisonChart();
+            createGapChart();
+            createDepartmentChart();
+            createManagerChart();
+        }
+
+        function updateCharts() {
+            try {
+                Object.values(charts).forEach(chart => {
+                    if (chart && typeof chart.destroy === 'function') {
+                        chart.destroy();
+                    }
+                });
+                charts = {}; // Clear the charts object
+                createCharts();
+            } catch (error) {
+                console.error('Error updating charts:', error);
+            }
+        }
+
+        function getRatingDistribution(data, type) {
+            const distribution = {};
+            ratings.forEach(rating => distribution[rating] = 0);
+            
+            data.forEach(emp => {
+                const rating = type === 'self' ? emp.selfEvaluation : emp.managerEvaluation;
+                distribution[rating]++;
+            });
+            
+            return distribution;
+        }
+
+        function createSelfEvalChart() {
+            const ctx = document.getElementById('selfEvalChart').getContext('2d');
+            const distribution = getRatingDistribution(filteredData, 'self');
+            
+            charts.selfEval = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ratings,
+                    datasets: [{
+                        label: 'Self-Evaluation',
+                        data: Object.values(distribution),
+                        backgroundColor: ratings.map(r => getRatingColor(r)),
+                        borderColor: ratings.map(r => getRatingColor(r)),
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const total = filteredData.length;
+                                    const value = context.parsed.y;
+                                    const percentage = ((value / total) * 100).toFixed(1);
+                                    return `${value} employees (${percentage}%)`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: { beginAtZero: true, ticks: { stepSize: 1 } }
+                    }
+                }
+            });
+        }
+
+        function createManagerEvalChart() {
+            const ctx = document.getElementById('managerEvalChart').getContext('2d');
+            const distribution = getRatingDistribution(filteredData, 'manager');
+            
+            charts.managerEval = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ratings,
+                    datasets: [{
+                        label: 'Manager Evaluation',
+                        data: Object.values(distribution),
+                        backgroundColor: ratings.map(r => getRatingColor(r)),
+                        borderColor: ratings.map(r => getRatingColor(r)),
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const total = filteredData.length;
+                                    const value = context.parsed.y;
+                                    const percentage = ((value / total) * 100).toFixed(1);
+                                    return `${value} employees (${percentage}%)`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: { beginAtZero: true, ticks: { stepSize: 1 } }
+                    }
+                }
+            });
+        }
+
+        function createComparisonChart() {
+            const ctx = document.getElementById('comparisonChart').getContext('2d');
+            const selfDist = getRatingDistribution(filteredData, 'self');
+            const managerDist = getRatingDistribution(filteredData, 'manager');
+            
+            charts.comparison = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ratings,
+                    datasets: [
+                        {
+                            label: 'Self-Evaluation',
+                            data: Object.values(selfDist),
+                            backgroundColor: 'rgba(59, 130, 246, 0.7)',
+                            borderColor: 'rgb(59, 130, 246)',
+                            borderWidth: 2
+                        },
+                        {
+                            label: 'Manager Evaluation',
+                            data: Object.values(managerDist),
+                            backgroundColor: 'rgba(168, 85, 247, 0.7)',
+                            borderColor: 'rgb(168, 85, 247)',
+                            borderWidth: 2
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: true, position: 'top' }
+                    },
+                    scales: {
+                        y: { beginAtZero: true, ticks: { stepSize: 1 } }
+                    }
+                }
+            });
+        }
+
+        function createGapChart() {
+            const ctx = document.getElementById('gapChart').getContext('2d');
+            const gaps = filteredData.map(e => e.managerRating - e.employeeRating);
+            
+            // Create histogram bins
+            const bins = {};
+            gaps.forEach(gap => {
+                const bin = Math.round(gap / 5) * 5; // Round to nearest 5
+                bins[bin] = (bins[bin] || 0) + 1;
+            });
+
+            const sortedBins = Object.keys(bins).sort((a, b) => a - b);
+            
+            charts.gap = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: sortedBins.map(b => `${b} pts`),
+                    datasets: [{
+                        label: 'Number of Employees',
+                        data: sortedBins.map(b => bins[b]),
+                        backgroundColor: sortedBins.map(b => b < 0 ? '#EF4444' : b > 0 ? '#10B981' : '#6B7280'),
+                        borderColor: sortedBins.map(b => b < 0 ? '#DC2626' : b > 0 ? '#059669' : '#4B5563'),
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                title: function(context) {
+                                    return `Gap: ${sortedBins[context[0].dataIndex]} points`;
+                                },
+                                label: function(context) {
+                                    return `${context.parsed.y} employees`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: { beginAtZero: true, title: { display: true, text: 'Count' } },
+                        x: { title: { display: true, text: 'Rating Gap (Manager - Self)' } }
+                    }
+                }
+            });
+        }
+
+        function createDepartmentChart() {
+            const ctx = document.getElementById('departmentChart').getContext('2d');
+            const divisionData = {};
+            
+            filteredData.forEach(emp => {
+                if (!divisionData[emp.employeeDivision]) {
+                    divisionData[emp.employeeDivision] = { self: {}, manager: {} };
+                    ratings.forEach(r => {
+                        divisionData[emp.employeeDivision].self[r] = 0;
+                        divisionData[emp.employeeDivision].manager[r] = 0;
+                    });
+                }
+                divisionData[emp.employeeDivision].self[emp.selfEvaluation]++;
+                divisionData[emp.employeeDivision].manager[emp.managerEvaluation]++;
+            });
+
+            const labels = Object.keys(divisionData);
+            const datasets = ratings.map(rating => ({
+                label: rating,
+                data: labels.map(div => divisionData[div].manager[rating]),
+                backgroundColor: getRatingColor(rating),
+                borderColor: getRatingColor(rating),
+                borderWidth: 1
+            }));
+            
+            charts.department = new Chart(ctx, {
+                type: 'bar',
+                data: { labels, datasets },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: true, position: 'top' },
+                        title: { display: true, text: 'Manager Ratings by Division' }
+                    },
+                    scales: {
+                        x: { stacked: true },
+                        y: { stacked: true, beginAtZero: true }
+                    }
+                }
+            });
+        }
+
+        function createManagerChart() {
+            const ctx = document.getElementById('managerChart').getContext('2d');
+            const managerData = {};
+            
+            filteredData.forEach(emp => {
+                if (!managerData[emp.managerName]) {
+                    managerData[emp.managerName] = {};
+                    ratings.forEach(r => managerData[emp.managerName][r] = 0);
+                }
+                managerData[emp.managerName][emp.managerEvaluation]++;
+            });
+
+            const labels = Object.keys(managerData);
+            const datasets = ratings.map(rating => ({
+                label: rating,
+                data: labels.map(mgr => managerData[mgr][rating]),
+                backgroundColor: getRatingColor(rating),
+                borderColor: getRatingColor(rating),
+                borderWidth: 1
+            }));
+            
+            charts.manager = new Chart(ctx, {
+                type: 'bar',
+                data: { labels, datasets },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: true, position: 'top' },
+                        title: { display: true, text: 'Rating Distribution by Manager' }
+                    },
+                    scales: {
+                        x: { stacked: true },
+                        y: { stacked: true, beginAtZero: true }
+                    }
+                }
+            });
+        }
+
+        function populateAlignmentMatrix() {
+            const matrix = {};
+            ratings.forEach(selfR => {
+                matrix[selfR] = {};
+                ratings.forEach(mgrR => {
+                    matrix[selfR][mgrR] = 0;
+                });
+            });
+
+            filteredData.forEach(emp => {
+                matrix[emp.selfEvaluation][emp.managerEvaluation]++;
+            });
+
+            const tbody = document.getElementById('matrixBody');
+            tbody.innerHTML = '';
+
+            const maxValue = Math.max(...Object.values(matrix).flatMap(row => Object.values(row)));
+
+            ratings.forEach(selfRating => {
+                const tr = document.createElement('tr');
+                tr.className = 'border-b border-gray-200';
+                
+                const th = document.createElement('th');
+                th.className = 'p-3 text-left font-semibold bg-gray-50';
+                th.textContent = selfRating;
+                tr.appendChild(th);
+
+                ratings.forEach((mgrRating, idx) => {
+                    const td = document.createElement('td');
+                    const count = matrix[selfRating][mgrRating];
+                    const intensity = maxValue > 0 ? count / maxValue : 0;
+                    
+                    const isDiagonal = selfRating === mgrRating;
+                    const bgColor = isDiagonal 
+                        ? `rgba(34, 197, 94, ${0.2 + intensity * 0.8})` 
+                        : `rgba(59, 130, 246, ${0.1 + intensity * 0.6})`;
+                    
+                    td.className = 'p-3 text-center font-semibold';
+                    td.style.backgroundColor = bgColor;
+                    td.textContent = count;
+                    
+                    if (isDiagonal) {
+                        td.classList.add('border-2', 'border-green-600');
+                    }
+                    
+                    tr.appendChild(td);
+                });
+
+                tbody.appendChild(tr);
+            });
+        }
+
+        function updateInsights() {
+            const panel = document.getElementById('insightsPanel');
+            const total = filteredData.length;
+            
+            const selfDist = getRatingDistribution(filteredData, 'self');
+            const mgrDist = getRatingDistribution(filteredData, 'manager');
+            
+            const overestimation = filteredData.filter(e => 
+                ratings.indexOf(e.selfEvaluation) < ratings.indexOf(e.managerEvaluation)
+            ).length;
+            
+            const perfectMatch = filteredData.filter(e => 
+                e.selfEvaluation === e.managerEvaluation
+            ).length;
+
+            const gaps = filteredData.map(e => e.managerRating - e.employeeRating);
+            const avgGap = (gaps.reduce((a, b) => a + b, 0) / gaps.length).toFixed(2);
+
+            // Find division with largest discrepancy
+            const divisionGaps = {};
+            filteredData.forEach(emp => {
+                if (!divisionGaps[emp.employeeDivision]) {
+                    divisionGaps[emp.employeeDivision] = [];
+                }
+                divisionGaps[emp.employeeDivision].push(Math.abs(emp.managerRating - emp.employeeRating));
+            });
+
+            let maxGapDivision = '';
+            let maxGapValue = 0;
+            Object.keys(divisionGaps).forEach(div => {
+                const avgDivGap = divisionGaps[div].reduce((a, b) => a + b, 0) / divisionGaps[div].length;
+                if (avgDivGap > maxGapValue) {
+                    maxGapValue = avgDivGap;
+                    maxGapDivision = div;
+                }
+            });
+
+            const insights = [
+                {
+                    icon: '📊',
+                    text: `${((overestimation / total) * 100).toFixed(1)}% of employees rated themselves higher than their managers`,
+                    color: 'text-red-600'
+                },
+                {
+                    icon: '⭐',
+                    text: `Exceptional ratings: ${((selfDist['EXCEPTIONAL'] / total) * 100).toFixed(1)}% (self) vs. ${((mgrDist['EXCEPTIONAL'] / total) * 100).toFixed(1)}% (manager)`,
+                    color: 'text-green-600'
+                },
+                {
+                    icon: '🎯',
+                    text: `${((perfectMatch / total) * 100).toFixed(1)}% perfect alignment between self and manager evaluations`,
+                    color: 'text-blue-600'
+                },
+                {
+                    icon: '📈',
+                    text: `Average rating gap is ${avgGap} points (Manager rating - Self rating)`,
+                    color: 'text-purple-600'
+                },
+                {
+                    icon: '🏢',
+                    text: `Largest discrepancy found in ${maxGapDivision} division (avg gap: ${maxGapValue.toFixed(2)} points)`,
+                    color: 'text-orange-600'
+                },
+                {
+                    icon: '✅',
+                    text: `${((mgrDist['HIGHLY EFFECTIVE'] + mgrDist['EXCEPTIONAL']) / total * 100).toFixed(1)}% of employees received "Highly Effective" or "Exceptional" from managers`,
+                    color: 'text-emerald-600'
+                }
+            ];
+
+            panel.innerHTML = insights.map(insight => `
+                <div class="flex items-start gap-4 bg-white p-4 rounded-lg shadow-sm">
+                    <span class="text-3xl">${insight.icon}</span>
+                    <p class="text-lg ${insight.color} font-semibold">${insight.text}</p>
+                </div>
+            `).join('');
+        }
+
+        function populateDataTable() {
+            const tbody = document.getElementById('tableBody');
+            tbody.innerHTML = '';
+
+            filteredData.forEach(emp => {
+                const gap = emp.managerRating - emp.employeeRating;
+                const alignment = emp.selfEvaluation === emp.managerEvaluation;
+                
+                let rowClass = 'border-b border-gray-200 hover:bg-gray-50';
+                if (alignment) {
+                    rowClass += ' bg-green-50';
+                } else if (gap > 5) {
+                    rowClass += ' bg-blue-50';
+                } else if (gap < -5) {
+                    rowClass += ' bg-red-50';
+                }
+
+                const tr = document.createElement('tr');
+                tr.className = rowClass;
+                tr.innerHTML = `
+                    <td class="p-3">${emp.employeeName}</td>
+                    <td class="p-3">${emp.employeeDivision}</td>
+                    <td class="p-3">${emp.employeeGrade}</td>
+                    <td class="p-3">${emp.managerName}</td>
+                    <td class="p-3 text-center">
+                        <span class="px-2 py-1 rounded text-xs font-semibold" style="background-color: ${getRatingColor(emp.selfEvaluation)}; color: white;">
+                            ${emp.selfEvaluation}
+                        </span>
+                    </td>
+                    <td class="p-3 text-center">
+                        <span class="px-2 py-1 rounded text-xs font-semibold" style="background-color: ${getRatingColor(emp.managerEvaluation)}; color: white;">
+                            ${emp.managerEvaluation}
+                        </span>
+                    </td>
+                    <td class="p-3 text-center">${emp.employeeRating.toFixed(2)}</td>
+                    <td class="p-3 text-center">${emp.managerRating.toFixed(2)}</td>
+                    <td class="p-3 text-center font-semibold ${gap > 0 ? 'text-green-600' : gap < 0 ? 'text-red-600' : 'text-gray-600'}">
+                        ${gap > 0 ? '+' : ''}${gap.toFixed(2)}
+                    </td>
+                    <td class="p-3 text-center">
+                        ${alignment ? '<span class="text-2xl">✓</span>' : '<span class="text-2xl text-gray-400">✗</span>'}
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function searchTable() {
+            const input = document.getElementById('searchTable');
+            const filter = input.value.toLowerCase();
+            const tbody = document.getElementById('tableBody');
+            const rows = tbody.getElementsByTagName('tr');
+
+            for (let i = 0; i < rows.length; i++) {
+                const row = rows[i];
+                const text = row.textContent || row.innerText;
+                if (text.toLowerCase().indexOf(filter) > -1) {
+                    row.style.display = '';
+                } else {
+                    row.style.display = 'none';
+                }
+            }
+        }
+
+        let sortDirection = {};
+        function sortTable(columnIndex) {
+            const tbody = document.getElementById('tableBody');
+            const rows = Array.from(tbody.getElementsByTagName('tr'));
+            
+            const direction = sortDirection[columnIndex] || 'asc';
+            sortDirection[columnIndex] = direction === 'asc' ? 'desc' : 'asc';
+
+            rows.sort((a, b) => {
+                const aText = a.cells[columnIndex].textContent.trim();
+                const bText = b.cells[columnIndex].textContent.trim();
+                
+                const aNum = parseFloat(aText);
+                const bNum = parseFloat(bText);
+                
+                if (!isNaN(aNum) && !isNaN(bNum)) {
+                    return direction === 'asc' ? aNum - bNum : bNum - aNum;
+                }
+                
+                return direction === 'asc' 
+                    ? aText.localeCompare(bText)
+                    : bText.localeCompare(aText);
+            });
+
+            rows.forEach(row => tbody.appendChild(row));
+        }
+
+        // Initialize dashboard when page loads
+        window.addEventListener('DOMContentLoaded', function() {
+            console.log('Employee Evaluation Dashboard loaded. Ready for CSV upload.');
+        });
+    </script>
+</body>
+</html>
