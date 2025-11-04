@@ -183,11 +183,11 @@
                     <thead>
                         <tr class="border-b-2 border-gray-300">
                             <th class="p-3 text-left font-semibold">Self ↓ / Manager →</th>
-                            <th class="p-3 text-center font-semibold bg-red-50">Unsatisfactory</th>
-                            <th class="p-3 text-center font-semibold bg-orange-50">Needs Improvements</th>
-                            <th class="p-3 text-center font-semibold bg-yellow-50">Meets Expectations</th>
-                            <th class="p-3 text-center font-semibold bg-green-50">Highly Effective</th>
                             <th class="p-3 text-center font-semibold bg-emerald-50">Exceptional</th>
+                            <th class="p-3 text-center font-semibold bg-green-50">Highly Effective</th>
+                            <th class="p-3 text-center font-semibold bg-yellow-50">Meets Expectations</th>
+                            <th class="p-3 text-center font-semibold bg-orange-50">Needs Improvements</th>
+                            <th class="p-3 text-center font-semibold bg-red-50">Unsatisfactory</th>
                         </tr>
                     </thead>
                     <tbody id="matrixBody">
@@ -857,6 +857,9 @@
 
             const maxValue = Math.max(...Object.values(matrix).flatMap(row => Object.values(row)));
 
+            // Reverse the ratings array for manager columns (left to right: best to worst)
+            const managerRatings = [...ratings].reverse();
+
             ratings.forEach(selfRating => {
                 const tr = document.createElement('tr');
                 tr.className = 'border-b border-gray-200';
@@ -866,7 +869,7 @@
                 th.textContent = selfRating;
                 tr.appendChild(th);
 
-                ratings.forEach((mgrRating, idx) => {
+                managerRatings.forEach((mgrRating, idx) => {
                     const td = document.createElement('td');
                     const count = matrix[selfRating][mgrRating];
                     const intensity = maxValue > 0 ? count / maxValue : 0;
