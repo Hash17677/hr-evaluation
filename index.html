@@ -184,8 +184,8 @@
                         <tr class="border-b-2 border-gray-300">
                             <th class="p-3 text-left font-semibold">Self ↓ / Manager →</th>
                             <th class="p-3 text-center font-semibold bg-red-50">Unsatisfactory</th>
-                            <th class="p-3 text-center font-semibold bg-orange-50">Needs Improvement</th>
-                            <th class="p-3 text-center font-semibold bg-yellow-50">Effective</th>
+                            <th class="p-3 text-center font-semibold bg-orange-50">Needs Improvements</th>
+                            <th class="p-3 text-center font-semibold bg-yellow-50">Meets Expectations</th>
                             <th class="p-3 text-center font-semibold bg-green-50">Highly Effective</th>
                             <th class="p-3 text-center font-semibold bg-emerald-50">Exceptional</th>
                         </tr>
@@ -296,7 +296,7 @@
 
     <script>
         // Global variables
-        const ratings = ['EXCEPTIONAL', 'HIGHLY EFFECTIVE', 'EFFECTIVE', 'NEEDS IMPROVEMENT', 'UNSATISFACTORY'];
+        const ratings = ['EXCEPTIONAL', 'HIGHLY EFFECTIVE', 'MEETS EXPECTATIONS', 'NEEDS IMPROVEMENTS', 'UNSATISFACTORY'];
         let employeeData = [];
         let filteredData = [];
         let charts = {};
@@ -549,8 +549,8 @@
             const colors = {
                 'EXCEPTIONAL': '#10B981',
                 'HIGHLY EFFECTIVE': '#34D399',
-                'EFFECTIVE': '#FBBF24',
-                'NEEDS IMPROVEMENT': '#F97316',
+                'MEETS EXPECTATIONS': '#FBBF24',
+                'NEEDS IMPROVEMENTS': '#F97316',
                 'UNSATISFACTORY': '#EF4444'
             };
             return colors[rating] || '#6B7280';
