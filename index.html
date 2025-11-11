@@ -100,7 +100,7 @@
     <!-- Executive Summary -->
     <div class="container mx-auto px-6 py-6">
         <h2 class="text-2xl font-bold text-gray-800 mb-6">Executive Summary</h2>
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <div class="grid grid-cols-1 md:grid-cols-5 gap-6">
             <div class="bg-white rounded-lg shadow-md p-6 card-bg transform hover:scale-105 transition">
                 <div class="flex items-center justify-between">
                     <div>
@@ -109,6 +109,17 @@
                     </div>
                     <div class="bg-blue-100 rounded-full p-4">
                         <span class="text-4xl">👥</span>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-white rounded-lg shadow-md p-6 card-bg transform hover:scale-105 transition">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-600 text-sm font-medium">Pending Evaluations</p>
+                        <h3 class="text-3xl font-bold text-orange-600 mt-2" id="pendingCount">0</h3>
+                    </div>
+                    <div class="bg-orange-100 rounded-full p-4">
+                        <span class="text-4xl">⏳</span>
                     </div>
                 </div>
             </div>
@@ -183,11 +194,11 @@
                     <thead>
                         <tr class="border-b-2 border-gray-300">
                             <th class="p-3 text-left font-semibold">Self ↓ / Manager →</th>
-                            <th class="p-3 text-center font-semibold bg-red-50">Unsatisfactory</th>
-                            <th class="p-3 text-center font-semibold bg-orange-50">Needs Improvements</th>
-                            <th class="p-3 text-center font-semibold bg-yellow-50">Meets Expectations</th>
-                            <th class="p-3 text-center font-semibold bg-green-50">Highly Effective</th>
                             <th class="p-3 text-center font-semibold bg-emerald-50">Exceptional</th>
+                            <th class="p-3 text-center font-semibold bg-green-50">Highly Effective</th>
+                            <th class="p-3 text-center font-semibold bg-yellow-50">Meets Expectations</th>
+                            <th class="p-3 text-center font-semibold bg-orange-50">Needs Improvements</th>
+                            <th class="p-3 text-center font-semibold bg-red-50">Unsatisfactory</th>
                         </tr>
                     </thead>
                     <tbody id="matrixBody">
@@ -509,6 +520,7 @@
             
             if (totalEmployees === 0) {
                 document.getElementById('totalEmployees').textContent = '0';
+                document.getElementById('pendingCount').textContent = '0';
                 document.getElementById('completionRate').textContent = '0%';
                 document.getElementById('avgRatingGap').textContent = '0';
                 document.getElementById('perfectAlignment').textContent = '0%';
@@ -518,25 +530,34 @@
                 return;
             }
             
-            const completionRate = 100; // All records with data are considered complete
+            // Filter to only completed evaluations (both employee and manager ratings > 0)
+            const completedEvaluations = filteredData.filter(e => 
+                e.employeeRating > 0 && e.managerRating > 0
+            );
             
-            const gaps = filteredData.map(e => e.managerRating - e.employeeRating);
-            const avgGap = (gaps.reduce((a, b) => a + b, 0) / gaps.length).toFixed(2);
+            const completedCount = completedEvaluations.length;
+            const pendingCount = totalEmployees - completedCount;
+            const completionRate = ((completedCount / totalEmployees) * 100).toFixed(1);
             
-            const perfectMatch = filteredData.filter(e => e.selfEvaluation === e.managerEvaluation).length;
-            const perfectAlignment = ((perfectMatch / totalEmployees) * 100).toFixed(1);
+            // Calculate metrics only from completed evaluations
+            const gaps = completedEvaluations.map(e => e.managerRating - e.employeeRating);
+            const avgGap = gaps.length > 0 ? (gaps.reduce((a, b) => a + b, 0) / gaps.length).toFixed(2) : '0.00';
+            
+            const perfectMatch = completedEvaluations.filter(e => e.selfEvaluation === e.managerEvaluation).length;
+            const perfectAlignment = completedCount > 0 ? ((perfectMatch / completedCount) * 100).toFixed(1) : '0.0';
 
             document.getElementById('totalEmployees').textContent = totalEmployees;
+            document.getElementById('pendingCount').textContent = pendingCount;
             document.getElementById('completionRate').textContent = completionRate + '%';
             document.getElementById('avgRatingGap').textContent = avgGap;
             document.getElementById('perfectAlignment').textContent = perfectAlignment + '%';
 
-            // Update gap analysis
-            const overestimation = filteredData.filter(e => {
+            // Update gap analysis - only for completed evaluations
+            const overestimation = completedEvaluations.filter(e => {
                 return ratings.indexOf(e.selfEvaluation) < ratings.indexOf(e.managerEvaluation);
             }).length;
             
-            const underestimation = filteredData.filter(e => {
+            const underestimation = completedEvaluations.filter(e => {
                 return ratings.indexOf(e.selfEvaluation) > ratings.indexOf(e.managerEvaluation);
             }).length;
 
@@ -580,10 +601,13 @@
         }
 
         function getRatingDistribution(data, type) {
+            // Filter to only completed evaluations
+            const completedData = data.filter(e => e.employeeRating > 0 && e.managerRating > 0);
+            
             const distribution = {};
             ratings.forEach(rating => distribution[rating] = 0);
             
-            data.forEach(emp => {
+            completedData.forEach(emp => {
                 const rating = type === 'self' ? emp.selfEvaluation : emp.managerEvaluation;
                 distribution[rating]++;
             });
@@ -594,6 +618,9 @@
         function createSelfEvalChart() {
             const ctx = document.getElementById('selfEvalChart').getContext('2d');
             const distribution = getRatingDistribution(filteredData, 'self');
+            
+            // Get completed count for percentage calculation
+            const completedData = filteredData.filter(e => e.employeeRating > 0 && e.managerRating > 0);
             
             charts.selfEval = new Chart(ctx, {
                 type: 'bar',
@@ -615,9 +642,9 @@
                         tooltip: {
                             callbacks: {
                                 label: function(context) {
-                                    const total = filteredData.length;
+                                    const total = completedData.length;
                                     const value = context.parsed.y;
-                                    const percentage = ((value / total) * 100).toFixed(1);
+                                    const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : '0.0';
                                     return `${value} employees (${percentage}%)`;
                                 }
                             }
@@ -633,6 +660,9 @@
         function createManagerEvalChart() {
             const ctx = document.getElementById('managerEvalChart').getContext('2d');
             const distribution = getRatingDistribution(filteredData, 'manager');
+            
+            // Get completed count for percentage calculation
+            const completedData = filteredData.filter(e => e.employeeRating > 0 && e.managerRating > 0);
             
             charts.managerEval = new Chart(ctx, {
                 type: 'bar',
@@ -654,9 +684,9 @@
                         tooltip: {
                             callbacks: {
                                 label: function(context) {
-                                    const total = filteredData.length;
+                                    const total = completedData.length;
                                     const value = context.parsed.y;
-                                    const percentage = ((value / total) * 100).toFixed(1);
+                                    const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : '0.0';
                                     return `${value} employees (${percentage}%)`;
                                 }
                             }
@@ -710,7 +740,10 @@
 
         function createGapChart() {
             const ctx = document.getElementById('gapChart').getContext('2d');
-            const gaps = filteredData.map(e => e.managerRating - e.employeeRating);
+            
+            // Filter to only completed evaluations
+            const completedData = filteredData.filter(e => e.employeeRating > 0 && e.managerRating > 0);
+            const gaps = completedData.map(e => e.managerRating - e.employeeRating);
             
             // Create histogram bins
             const bins = {};
@@ -761,7 +794,10 @@
             const ctx = document.getElementById('departmentChart').getContext('2d');
             const divisionData = {};
             
-            filteredData.forEach(emp => {
+            // Filter to only completed evaluations
+            const completedData = filteredData.filter(e => e.employeeRating > 0 && e.managerRating > 0);
+            
+            completedData.forEach(emp => {
                 if (!divisionData[emp.employeeDivision]) {
                     divisionData[emp.employeeDivision] = { self: {}, manager: {} };
                     ratings.forEach(r => {
@@ -804,7 +840,10 @@
             const ctx = document.getElementById('managerChart').getContext('2d');
             const managerData = {};
             
-            filteredData.forEach(emp => {
+            // Filter to only completed evaluations
+            const completedData = filteredData.filter(e => e.employeeRating > 0 && e.managerRating > 0);
+            
+            completedData.forEach(emp => {
                 if (!managerData[emp.managerName]) {
                     managerData[emp.managerName] = {};
                     ratings.forEach(r => managerData[emp.managerName][r] = 0);
@@ -848,7 +887,10 @@
                 });
             });
 
-            filteredData.forEach(emp => {
+            // Filter to only completed evaluations
+            const completedData = filteredData.filter(e => e.employeeRating > 0 && e.managerRating > 0);
+            
+            completedData.forEach(emp => {
                 matrix[emp.selfEvaluation][emp.managerEvaluation]++;
             });
 
@@ -857,10 +899,10 @@
 
             const maxValue = Math.max(...Object.values(matrix).flatMap(row => Object.values(row)));
 
-            // Reverse ratings to go from worst to best (UNSATISFACTORY to EXCEPTIONAL)
-            const reversedRatings = [...ratings].reverse();
+            // Show ratings from best to worst (EXCEPTIONAL to UNSATISFACTORY)
+            const displayRatings = [...ratings]; // Keep the original order from ratings array
 
-            reversedRatings.forEach(selfRating => {
+            displayRatings.forEach(selfRating => {
                 const tr = document.createElement('tr');
                 tr.className = 'border-b border-gray-200';
                 
@@ -869,7 +911,7 @@
                 th.textContent = selfRating;
                 tr.appendChild(th);
 
-                reversedRatings.forEach((mgrRating, idx) => {
+                displayRatings.forEach((mgrRating, idx) => {
                     const td = document.createElement('td');
                     const count = matrix[selfRating][mgrRating];
                     const intensity = maxValue > 0 ? count / maxValue : 0;
@@ -896,25 +938,33 @@
 
         function updateInsights() {
             const panel = document.getElementById('insightsPanel');
-            const total = filteredData.length;
+            
+            // Filter to only completed evaluations
+            const completedData = filteredData.filter(e => e.employeeRating > 0 && e.managerRating > 0);
+            const total = completedData.length;
+            
+            if (total === 0) {
+                panel.innerHTML = '<div class="flex items-start gap-4 bg-white p-4 rounded-lg shadow-sm"><p class="text-lg text-gray-600">No completed evaluations to analyze yet.</p></div>';
+                return;
+            }
             
             const selfDist = getRatingDistribution(filteredData, 'self');
             const mgrDist = getRatingDistribution(filteredData, 'manager');
             
-            const overestimation = filteredData.filter(e => 
+            const overestimation = completedData.filter(e => 
                 ratings.indexOf(e.selfEvaluation) < ratings.indexOf(e.managerEvaluation)
             ).length;
             
-            const perfectMatch = filteredData.filter(e => 
+            const perfectMatch = completedData.filter(e => 
                 e.selfEvaluation === e.managerEvaluation
             ).length;
 
-            const gaps = filteredData.map(e => e.managerRating - e.employeeRating);
+            const gaps = completedData.map(e => e.managerRating - e.employeeRating);
             const avgGap = (gaps.reduce((a, b) => a + b, 0) / gaps.length).toFixed(2);
 
             // Find division with largest discrepancy
             const divisionGaps = {};
-            filteredData.forEach(emp => {
+            completedData.forEach(emp => {
                 if (!divisionGaps[emp.employeeDivision]) {
                     divisionGaps[emp.employeeDivision] = [];
                 }
